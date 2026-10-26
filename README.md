@@ -40,6 +40,7 @@ The included workflow tests, builds, and deploys pushes to `main`. Set repositor
 
 - Capture cannot recover audio from before you started sharing. A site cannot silently enumerate or capture other tabs.
 - Capture support depends on browser/OS and the source. Import remains available when tab capture is unavailable.
+- Firefox currently grants screen-sharing permission without providing an audio track. The app shows an upfront Firefox notice; use desktop Chrome/Edge for tab audio capture, with the source tab in the same browser. This limitation is tracked in [Mozilla bug 1541425](https://bugzilla.mozilla.org/show_bug.cgi?id=1541425).
 - Silence cleanup is applied when saving or importing. Adjust it before creating the clip; existing clips keep their saved samples. Export settings apply when downloading.
 - Audio preview uses a PCM WAV; MP3 compression is applied on download. Manual start/end times apply to playback and export.
 - Opus exports take the length of the clip. Keep the page open until export completes. The result has a `.webm` extension; it is an audio-only WebM container, not an Ogg `.opus` file.

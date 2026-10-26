@@ -15,9 +15,9 @@
       <div class="workspace">
         <section class="capture panel" aria-labelledby="capture-title">
           <div class="panel-heading"><h2 id="capture-title"><span class="step">01</span> Catch your audio</h2><span id="capture-badge" class="badge">READY WHEN YOU ARE</span></div>
-          <div class="scope"><canvas id="live-wave" aria-label="Live audio level visualization"></canvas><div class="scope-info"><span id="source-label">A little quiet in here.</span><strong id="timer">00:00</strong></div><span class="scope-hint" id="scope-hint">Choose a tab to bring it to life</span></div>
+          <p id="browser-notice" class="browser-notice" hidden></p><div class="scope"><canvas id="live-wave" aria-label="Live audio level visualization"></canvas><div class="scope-info"><span id="source-label">A little quiet in here.</span><strong id="timer">00:00</strong></div><span class="scope-hint" id="scope-hint">Choose a tab to bring it to life</span></div>
           <div class="capture-actions"><button id="start" class="primary">● &nbsp; Choose audio tab</button><button id="stop" class="danger" disabled>■ &nbsp; Stop & save</button><button id="save" class="secondary" disabled>＋ Save last 30s</button></div>
-          <div class="capture-options"><label>Capture mode<select id="mode"><option value="rolling">Rolling buffer</option><option value="record">Full recording</option></select></label><label id="buffer-label">Keep the last<select id="buffer"><option value="15">15 seconds</option><option value="30" selected>30 seconds</option><option value="60">60 seconds</option><option value="120">2 minutes</option><option value="300">5 minutes</option><option value="480">8 minutes</option></select></label><p id="mode-help">Always ready for “wait, save that.” Start capture before the moment happens.</p></div>
+          <div id="status" role="status" aria-live="polite">Ready. Nothing is recorded until you start capture.</div><div class="capture-options"><label>Capture mode<select id="mode"><option value="rolling">Rolling buffer</option><option value="record">Full recording</option></select></label><label id="buffer-label">Keep the last<select id="buffer"><option value="15">15 seconds</option><option value="30" selected>30 seconds</option><option value="60">60 seconds</option><option value="120">2 minutes</option><option value="300">5 minutes</option><option value="480">8 minutes</option></select></label><p id="mode-help">Always ready for “wait, save that.” Start capture before the moment happens.</p></div>
           <div class="import-row"><span>Already have a sound?</span><button id="import" class="text-button">Import audio ↗</button><input id="file" type="file" accept="audio/*,.webm,.mp4" hidden /></div>
           <p class="capture-note">In the browser picker, choose a <strong>tab</strong> and enable <strong>Share tab audio</strong>. Desktop Chrome or Edge recommended.</p>
         </section>
@@ -28,7 +28,6 @@
         </aside>
         <section class="clips panel" aria-labelledby="clips-title"><div class="panel-heading"><h2 id="clips-title"><span class="step">03</span> Your soundbites <span id="clip-count">0</span></h2><button id="clear" class="text-button" disabled>Clear all</button></div><div id="clip-list"><div class="empty"><span class="empty-icon">✂</span><h3>The good bits go here.</h3><p>Capture a moment or import an audio file.<br>Preview it, give it a name, and make it yours.</p></div></div></section>
       </div>
-      <div id="status" role="status" aria-live="polite">Ready. Nothing is recorded until you start capture.</div>
     </main>
     <footer><span>Made for the moments worth keeping.</span><span>No account. No uploads. Just sound. · <a href="./LAME-LICENSE.txt">Encoder license</a></span></footer>
   </div>

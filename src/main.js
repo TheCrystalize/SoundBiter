@@ -7,6 +7,9 @@ const MAX_CLIP_SECONDS = 600;
 const MAX_RECORDING_SECONDS = 480;
 const MAX_LIBRARY_SAMPLES = 48000 * 600; // Ten minutes of stereo PCM, across the library.
 const opusSupported = typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported('audio/webm;codecs=opus');
+// A browser hint for guidance only; the returned audio tracks remain the capability check.
+const firefox = /Firefox\//i.test(navigator.userAgent);
+const firefoxHelp = 'Firefox can share the screen but does not currently share its audio. Open SoundBiter and the source audio tab in desktop Chrome or Edge, then select the tab and enable “Share tab audio”. Audio-file import still works here.';
 let session = null;
 let starting = false;
 let stopping = false;
@@ -69,10 +72,12 @@ async function startCapture() {
   if (session || starting || stopping) return;
   starting = true;
   updateControls();
+  status('Waiting for the browser sharing picker. Choose the tab playing your sound and enable “Share tab audio”.');
   let stream, context;
   try {
     stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true, preferCurrentTab: false, selfBrowserSurface: 'exclude', systemAudio: 'exclude' });
-    if (!stream.getAudioTracks().length) throw new Error('No audio was shared. Choose a browser tab and turn on “Share tab audio”, then try again.');
+    if (!stream.getAudioTracks().length) throw new Error(firefox ? firefoxHelp : 'The browser shared video without audio. Choose a browser tab and enable “Share tab audio”. If that option is missing, open both SoundBiter and the source tab in desktop Chrome or Edge.');
+    status('Audio sharing allowed. Starting the recorder…');
     context = new AudioContext();
     await context.resume();
     await context.audioWorklet.addModule(`${import.meta.env.BASE_URL}capture-worklet.js`);
@@ -330,3 +335,7 @@ $('opus-option').disabled = !opusSupported;
 if (!opusSupported) $('opus-option').textContent = 'Opus (not supported here)';
 drawWave($('live-wave'));
 if (!navigator.mediaDevices?.getDisplayMedia) status('Tab capture is unavailable in this browser. Try desktop Chrome or Edge over HTTPS. You can still import audio files.', true);
+if (firefox) {
+  $('browser-notice').hidden = false;
+  $('browser-notice').textContent = firefoxHelp;
+}
