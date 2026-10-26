@@ -4,6 +4,7 @@ import { SampleBuffer, processAudio, encodeWav, safeFilename } from './audio.js'
 const $ = id => document.getElementById(id);
 const clips = [];
 const MAX_CLIP_SECONDS = 600;
+const MAX_RECORDING_SECONDS = 480;
 const MAX_LIBRARY_SAMPLES = 48000 * 600; // Ten minutes of stereo PCM, across the library.
 const opusSupported = typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported('audio/webm;codecs=opus');
 let session = null;
@@ -25,8 +26,9 @@ function updateControls() {
   $('buffer-label').hidden = $('mode').value !== 'rolling';
   $('mode-help').textContent = $('mode').value === 'rolling'
     ? 'Always ready for “wait, save that.” Start capture before the moment happens.'
-    : 'Record from start to stop. Automatically saves at 10 minutes.';
-  $('save').textContent = $('mode').value === 'rolling' ? `＋ Save last ${$('buffer').value}s` : '＋ Save so far';
+    : 'Record from start to stop. Automatically saves at 8 minutes.';
+  const bufferSeconds = +$('buffer').value;
+  $('save').textContent = $('mode').value === 'rolling' ? `＋ Save last ${bufferSeconds >= 60 ? `${bufferSeconds / 60} min` : `${bufferSeconds}s`}` : '＋ Save so far';
   $('capture-badge').textContent = capturing ? '● CAPTURING' : starting ? 'CHOOSE A TAB' : 'READY WHEN YOU ARE';
   $('capture-badge').classList.toggle('active', capturing);
 }
@@ -82,19 +84,22 @@ async function startCapture() {
     mute.gain.value = 0;
     source.connect(analyser);
     source.connect(node).connect(mute).connect(context.destination);
-    const seconds = $('mode').value === 'rolling' ? +$('buffer').value : MAX_CLIP_SECONDS;
+    const seconds = $('mode').value === 'rolling' ? +$('buffer').value : MAX_RECORDING_SECONDS;
     const current = { stream, context, source, node, analyser, mute, meter: new Float32Array(2048), buffer: new SampleBuffer(seconds * context.sampleRate), total: 0, flush: null };
     session = current;
     node.port.onmessage = ({ data }) => {
       if (data.flushed) { current.flush?.(); return; }
       if (!data.channels || session !== current) return;
-      current.buffer.append(data.channels);
-      current.total += data.channels[0].length;
-      if ($('mode').value === 'record' && current.total >= MAX_CLIP_SECONDS * context.sampleRate && !stopping) stopCapture();
+      const channels = $('mode').value === 'record'
+        ? data.channels.map(channel => channel.subarray(0, Math.max(0, MAX_RECORDING_SECONDS * context.sampleRate - current.total)))
+        : data.channels;
+      if (channels[0].length) current.buffer.append(channels);
+      current.total += channels[0].length;
+      if ($('mode').value === 'record' && current.total >= MAX_RECORDING_SECONDS * context.sampleRate && !stopping) stopCapture();
     };
     stream.getTracks().forEach(track => track.addEventListener('ended', () => { if (session === current && !stopping) stopCapture(); }));
     $('source-label').textContent = 'Listening to your shared tab';
-    $('scope-hint').textContent = $('mode').value === 'rolling' ? `Keeping the most recent ${seconds} seconds` : 'Recording · 10 minute limit';
+    $('scope-hint').textContent = $('mode').value === 'rolling' ? `Keeping the most recent ${seconds >= 60 ? `${seconds / 60} minutes` : `${seconds} seconds`}` : 'Recording · 8 minute limit';
     status('Capture started. Save a moment anytime, or stop to save the current recording.');
     animate();
   } catch (error) {

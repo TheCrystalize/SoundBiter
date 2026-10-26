@@ -5,7 +5,7 @@ Catch browser audio, cut the quiet, and download the good bit. A static, browser
 ## Features
 
 - User-approved browser-tab audio capture (desktop Chrome/Edge recommended).
-- Rolling 15/30/60/120-second buffer, or full recording up to 10 minutes.
+- Rolling 15/30-second or 1/2/5/8-minute buffer, or full recording up to 8 minutes.
 - Save a clip while capture continues; stop automatically saves the current buffer.
 - Import browser-decodable audio files, up to 80 MB and 10 minutes.
 - RMS-based silence detection: trim edges, remove long pauses, or split at pauses. Adjustable threshold, silence duration, padding, and 5 ms fades.
