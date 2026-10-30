@@ -75,10 +75,14 @@ async function startCapture() {
   status('Waiting for the browser sharing picker. Choose the tab playing your sound and enable “Share tab audio”.');
   let stream, context;
   try {
-    stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true, preferCurrentTab: false, selfBrowserSurface: 'exclude', systemAudio: 'exclude' });
+    // Voice processing is meant for microphones: keep the tab's audio unfiltered and in stereo.
+    const audio = { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 2 };
+    stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio, preferCurrentTab: false, selfBrowserSurface: 'exclude', systemAudio: 'exclude' });
     if (!stream.getAudioTracks().length) throw new Error(firefox ? firefoxHelp : 'The browser shared video without audio. Choose a browser tab and enable “Share tab audio”. If that option is missing, open both SoundBiter and the source tab in desktop Chrome or Edge.');
     status('Audio sharing allowed. Starting the recorder…');
-    context = new AudioContext();
+    // Record at the tab's own sample rate rather than the output device's, so samples are never resampled.
+    const { sampleRate } = stream.getAudioTracks()[0].getSettings();
+    context = new AudioContext(sampleRate ? { sampleRate } : {});
     await context.resume();
     await context.audioWorklet.addModule(`${import.meta.env.BASE_URL}capture-worklet.js`);
     const source = context.createMediaStreamSource(new MediaStream(stream.getAudioTracks()));
@@ -156,7 +160,7 @@ function saveSamples(channels, rate, baseName) {
     const date = new Date();
     const stamp = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
     const name = baseName ? `${baseName}${cuts.length > 1 ? `-${sequence}` : ''}` : `soundbite-${stamp}-${String(sequence).padStart(3, '0')}`;
-    const clip = { id: sequence, channels: cut, rate, name, url: URL.createObjectURL(new Blob([encodeWav(cut, rate)], { type: 'audio/wav' })), start: 0, end: cut[0].length / rate };
+    const clip = { id: sequence, channels: cut, rate, name, url: URL.createObjectURL(new Blob([encodeWav(cut, rate, 32)], { type: 'audio/wav' })), start: 0, end: cut[0].length / rate };
     clips.unshift(clip);
   }
   renderClips();
@@ -182,7 +186,7 @@ function renderClips() {
   for (const clip of clips) {
     const card = document.createElement('article');
     card.className = 'clip';
-    card.innerHTML = `<div class="clip-top"><span class="clip-number">${String(clip.id).padStart(2, '0')}</span><input class="clip-name" aria-label="Clip filename" maxlength="120" /><button class="delete" aria-label="Delete clip" title="Delete clip">×</button></div><canvas class="clip-wave" aria-label="Clip waveform"></canvas><audio controls preload="metadata" aria-describedby="preview-note-${clip.id}"></audio><p id="preview-note-${clip.id}" class="fine-print">Preview uses 16-bit WAV. Downloads use your selected format and quality settings.</p><div class="clip-trim"><label>Start (s)<input class="clip-start" type="number" min="0" step="0.01" /></label><label>End (s)<input class="clip-end" type="number" min="0.01" step="0.01" /></label><span class="clip-duration"></span><button class="download secondary">Download ↧</button></div>`;
+    card.innerHTML = `<div class="clip-top"><span class="clip-number">${String(clip.id).padStart(2, '0')}</span><input class="clip-name" aria-label="Clip filename" maxlength="120" /><button class="delete" aria-label="Delete clip" title="Delete clip">×</button></div><canvas class="clip-wave" aria-label="Clip waveform"></canvas><audio controls preload="metadata" aria-describedby="preview-note-${clip.id}"></audio><p id="preview-note-${clip.id}" class="fine-print">Preview is lossless (32-bit float WAV at the clip’s sample rate). Downloads use your selected format and quality settings.</p><div class="clip-trim"><label>Start (s)<input class="clip-start" type="number" min="0" step="0.01" /></label><label>End (s)<input class="clip-end" type="number" min="0.01" step="0.01" /></label><span class="clip-duration"></span><button class="download secondary">Download ↧</button></div>`;
     const name = card.querySelector('.clip-name');
     name.value = clip.name;
     name.addEventListener('input', () => { clip.name = name.value; });
@@ -197,7 +201,8 @@ function renderClips() {
     const end = card.querySelector('.clip-end');
     start.value = clip.start.toFixed(2); end.value = clip.end.toFixed(2);
     const duration = clip.channels[0].length / clip.rate;
-    start.max = duration; end.max = duration;
+    // Match the two-decimal display: a rounded-up end would otherwise fail validation and block downloads.
+    start.max = end.max = duration.toFixed(2);
     const updateDuration = () => { card.querySelector('.clip-duration').textContent = `${(clip.end - clip.start).toFixed(2)}s · ${Math.round(clip.rate / 1000 * 10) / 10} kHz`; };
     const changeTrim = event => {
       const nextStart = +start.value, nextEnd = +end.value;
@@ -250,7 +255,10 @@ async function downloadClip(clip, button) {
   button.disabled = true; button.textContent = 'Encoding…';
   let worker;
   // Snapshot settings so changes during an export cannot mismatch the filename and encoder.
-  const settings = { rate: $('format').value === 'wav' ? +$('rate').value : $('format').value === 'opus' ? 48000 : 44100, format: $('format').value, bitrate: +$('bitrate').value, depth: +$('depth').value };
+  const format = $('format').value;
+  // Avoid resampling where the format allows: WAV takes any rate, and MP3 supports 48 kHz. Opus always runs at 48 kHz.
+  const rate = format === 'opus' ? 48000 : format === 'mp3' ? (clip.rate >= 48000 ? 48000 : 44100) : $('rate').value === 'original' ? clip.rate : +$('rate').value;
+  const settings = { rate, format, bitrate: +$('bitrate').value, depth: +$('depth').value };
   const name = safeFilename(clip.name);
   let opusContext;
   try {
@@ -309,7 +317,11 @@ $('format').addEventListener('change', () => {
   $('bitrate-label').hidden = $('format').value === 'wav';
   $('depth-label').hidden = $('format').value !== 'wav';
   $('rate-label').hidden = $('format').value !== 'wav';
-  $('export-note').textContent = $('format').value === 'opus' ? 'Opus uses a target bitrate and exports in real time to WebM. Keep this tab open until it finishes.' : 'Export settings apply at download. MP3 chooses its sample rate to suit the bitrate. Higher bitrate cannot restore missing detail.';
+  $('export-note').textContent = {
+    mp3: 'Export settings apply at download. MP3 chooses its sample rate to suit the bitrate. Higher bitrate cannot restore missing detail.',
+    wav: 'Original sample rate with 32-bit float is lossless. 16-bit plays almost everywhere.',
+    opus: 'Opus uses a target bitrate and exports in real time to WebM. Keep this tab open until it finishes.',
+  }[$('format').value];
 });
 $('import').addEventListener('click', () => $('file').click());
 $('file').addEventListener('change', async event => {

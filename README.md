@@ -4,7 +4,7 @@ Catch browser audio, cut the quiet, and download the good bit. A static, browser
 
 ## Features
 
-- User-approved browser-tab audio capture (desktop Chrome/Edge recommended).
+- User-approved browser-tab audio capture (desktop Chrome/Edge recommended), at the tab's own sample rate with the browser's voice processing (echo cancellation, noise suppression, auto gain) turned off.
 - Rolling 15/30-second or 1/2/5/8-minute buffer, or full recording up to 8 minutes.
 - Save a clip while capture continues; stop automatically saves the current buffer.
 - Import browser-decodable audio files, up to 80 MB and 10 minutes.
@@ -12,7 +12,8 @@ Catch browser audio, cut the quiet, and download the good bit. A static, browser
 - Waveforms, native playback, editable filenames, manual start/end times, and clip removal.
 - MP3: 64/96/128/192/256/320 kbps using a bundled LAME encoder in a worker.
 - Opus in WebM: selectable target bitrate where supported, encoded locally in real time.
-- PCM WAV: 16/24-bit, 44.1/48 kHz. All formats offer mono/stereo. MP3 selects an appropriate sample rate for the chosen bitrate; low bitrates may use a lower sample rate.
+- WAV: 16/24-bit PCM or 32-bit float, at the original sample rate or 44.1/48 kHz. 32-bit float at the original rate is lossless.
+- All formats offer mono/stereo. MP3 keeps 48 kHz audio at 48 kHz (other rates use 44.1 kHz), and the encoder may lower the sample rate for low bitrates.
 - Bounded in-memory library (100 clips or about 10 minutes of stereo audio).
 
 ## Run locally
@@ -42,7 +43,7 @@ The included workflow tests, builds, and deploys pushes to `main`. Set repositor
 - Capture support depends on browser/OS and the source. Import remains available when tab capture is unavailable.
 - Firefox currently grants screen-sharing permission without providing an audio track. The app shows an upfront Firefox notice; use desktop Chrome/Edge for tab audio capture, with the source tab in the same browser. This limitation is tracked in [Mozilla bug 1541425](https://bugzilla.mozilla.org/show_bug.cgi?id=1541425).
 - Silence cleanup is applied when saving or importing. Adjust it before creating the clip; existing clips keep their saved samples. Export settings apply when downloading.
-- Audio preview uses a PCM WAV; MP3 compression is applied on download. Manual start/end times apply to playback and export.
+- Audio preview is lossless: a 32-bit float WAV at the clip's sample rate. Compression and format conversion are applied on download. Manual start/end times apply to playback and export.
 - Opus exports take the length of the clip. Keep the page open until export completes. The result has a `.webm` extension; it is an audio-only WebM container, not an Ogg `.opus` file.
 - Clips live in memory only. Download before closing or reloading. The page requests a leave warning while clips or a capture exist.
 - Imported multichannel audio uses its first two channels; mono is duplicated for stereo preview. Mono export averages both channels.

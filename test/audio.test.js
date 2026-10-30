@@ -63,6 +63,25 @@ test('WAV headers describe accurate sample rate, channels, depth, and size', () 
     else assert.deepEqual([...new Uint8Array(buffer, 44, 3)], [0, 0, 128]);
   }
 });
+test('32-bit float WAV stores captured samples exactly, including peaks above full scale', () => {
+  const samples = [new Float32Array([-1, 0.123456789, 1.5]), new Float32Array([0.25, -0.000001, -2])];
+  const buffer = encodeWav(samples, 48000, 32);
+  const view = new DataView(buffer);
+  const text = (offset, length) => String.fromCharCode(...new Uint8Array(buffer, offset, length));
+  assert.equal(view.getUint32(4, true), buffer.byteLength - 8);
+  assert.equal(view.getUint32(16, true), 18);
+  assert.equal(view.getUint16(20, true), 3);
+  assert.equal(view.getUint32(24, true), 48000);
+  assert.equal(view.getUint32(28, true), 48000 * 2 * 4);
+  assert.equal(view.getUint16(32, true), 8);
+  assert.equal(view.getUint16(34, true), 32);
+  assert.equal(text(38, 4), 'fact');
+  assert.equal(view.getUint32(46, true), 3);
+  assert.equal(text(50, 4), 'data');
+  assert.equal(view.getUint32(54, true), 24);
+  assert.equal(buffer.byteLength, 58 + 24);
+  for (let i = 0; i < 3; i++) for (let c = 0; c < 2; c++) assert.equal(view.getFloat32(58 + (i * 2 + c) * 4, true), samples[c][i]);
+});
 test('filenames remove path characters and duplicate extensions', () => {
   assert.equal(safeFilename('hello/world?.mp3'), 'hello-world-');
   assert.equal(safeFilename('   '), 'soundbite');

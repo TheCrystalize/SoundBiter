@@ -80,21 +80,28 @@ export function processAudio(channels, sampleRate, options) {
 
 export function encodeWav(channels, rate, depth = 16) {
   const bytes = depth / 8;
+  // 32-bit stores the samples unchanged as IEEE float, a non-PCM format: an empty fmt extension and a fact chunk follow.
+  const float = depth === 32;
+  const header = float ? 58 : 44;
   const dataSize = channels[0].length * channels.length * bytes;
-  const buffer = new ArrayBuffer(44 + dataSize);
+  const buffer = new ArrayBuffer(header + dataSize);
   const view = new DataView(buffer);
   const text = (offset, value) => [...value].forEach((c, i) => view.setUint8(offset + i, c.charCodeAt(0)));
-  text(0, 'RIFF'); view.setUint32(4, 36 + dataSize, true); text(8, 'WAVE'); text(12, 'fmt ');
-  view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, channels.length, true);
+  text(0, 'RIFF'); view.setUint32(4, header - 8 + dataSize, true); text(8, 'WAVE'); text(12, 'fmt ');
+  view.setUint32(16, float ? 18 : 16, true); view.setUint16(20, float ? 3 : 1, true); view.setUint16(22, channels.length, true);
   view.setUint32(24, rate, true); view.setUint32(28, rate * channels.length * bytes, true);
   view.setUint16(32, channels.length * bytes, true); view.setUint16(34, depth, true);
-  text(36, 'data'); view.setUint32(40, dataSize, true);
-  let offset = 44;
+  if (float) { view.setUint16(36, 0, true); text(38, 'fact'); view.setUint32(42, 4, true); view.setUint32(46, channels[0].length, true); }
+  text(header - 8, 'data'); view.setUint32(header - 4, dataSize, true);
+  let offset = header;
   for (let i = 0; i < channels[0].length; i++) for (const channel of channels) {
-    const sample = Math.max(-1, Math.min(1, channel[i]));
-    const value = Math.round(sample * (sample < 0 ? 2 ** (depth - 1) : 2 ** (depth - 1) - 1));
-    if (depth === 16) view.setInt16(offset, value, true);
-    else { view.setUint8(offset, value & 255); view.setUint8(offset + 1, (value >> 8) & 255); view.setUint8(offset + 2, (value >> 16) & 255); }
+    if (float) view.setFloat32(offset, channel[i], true);
+    else {
+      const sample = Math.max(-1, Math.min(1, channel[i]));
+      const value = Math.round(sample * (sample < 0 ? 2 ** (depth - 1) : 2 ** (depth - 1) - 1));
+      if (depth === 16) view.setInt16(offset, value, true);
+      else { view.setUint8(offset, value & 255); view.setUint8(offset + 1, (value >> 8) & 255); view.setUint8(offset + 2, (value >> 16) & 255); }
+    }
     offset += bytes;
   }
   return buffer;
